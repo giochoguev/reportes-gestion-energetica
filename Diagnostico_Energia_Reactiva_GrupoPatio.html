@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diagnóstico de Energía Reactiva — Grupo Patio | Binswanger Perú</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg: #f5f4f2;
+    --panel: #ffffff;
+    --panel-2: #faf9f7;
+    --line: #e2e0dc;
+    --line-soft: #ececea;
+    --ink: #15151a;
+    --muted: #6c6b6f;
+    --muted-2: #9a9a9d;
+    --red: #d40032;
+    --red-dark: #9c0026;
+    --red-soft: rgba(212,0,50,0.08);
+    --black-soft: rgba(21,21,26,0.06);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background: var(--bg);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .wrap{max-width:1280px;margin:0 auto;padding:0 24px 80px;}
+
+  /* ---- top institutional bar ---- */
+  .topbar{
+    background:var(--ink);
+    height:5px;width:100%;
+  }
+
+  /* ---- header ---- */
+  header{
+    display:flex;justify-content:space-between;align-items:flex-end;
+    border-bottom:2px solid var(--ink);
+    padding:26px 0 20px;margin-bottom:26px;flex-wrap:wrap;gap:20px;
+  }
+  .head-left{display:flex;flex-direction:column;gap:14px;}
+  .logo-row{display:flex;align-items:center;gap:14px;}
+  .logo-row img{height:34px;display:block;}
+  .logo-divider{width:1px;height:26px;background:var(--line);}
+  .doc-tag{
+    font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--red);font-weight:600;
+  }
+  h1{font-family:'Playfair Display',serif;font-size:27px;margin:0 0 4px;font-weight:600;letter-spacing:-0.01em;color:var(--ink);}
+  .sub{color:var(--muted);font-size:13.5px;max-width:620px;line-height:1.55;}
+  .period{
+    text-align:right;font-family:'IBM Plex Mono',monospace;color:var(--muted);font-size:11.5px;
+    letter-spacing:.03em;
+  }
+  .period b{display:block;color:var(--ink);font-size:15px;font-weight:600;margin-top:5px;font-family:'Inter',sans-serif;}
+
+  /* ---- filter panel ---- */
+  .filters{
+    background:var(--panel);border:1px solid var(--line);border-radius:4px;
+    padding:16px 20px;margin-bottom:24px;
+    display:flex;flex-direction:column;gap:12px;
+    border-left:3px solid var(--ink);
+  }
+  .filter-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .filter-label{
+    font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--muted-2);width:78px;flex-shrink:0;
+  }
+  .chip{
+    font-family:'IBM Plex Mono',monospace;font-size:12px;padding:6px 12px;border-radius:2px;
+    border:1px solid var(--line);background:var(--panel-2);color:var(--muted);cursor:pointer;
+    transition:all .15s ease;user-select:none;
+  }
+  .chip:hover{border-color:var(--muted-2);color:var(--ink);}
+  .chip.active{background:var(--red-soft);border-color:var(--red);color:var(--red-dark);}
+  .chip.active.blk{background:var(--black-soft);border-color:var(--ink);color:var(--ink);}
+
+  /* ---- KPI grid ---- */
+  .kpis{
+    display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px;
+  }
+  .kpi{
+    background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:16px 16px 14px;
+    position:relative;overflow:hidden;
+  }
+  .kpi::before{content:"";position:absolute;top:0;left:0;width:100%;height:3px;background:var(--kpi-accent,var(--red));}
+  .kpi-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2);margin-bottom:10px;}
+  .kpi-value{font-family:'IBM Plex Mono',monospace;font-size:21px;font-weight:600;color:var(--ink);line-height:1.1;}
+  .kpi-value small{font-size:12px;color:var(--muted);font-weight:400;margin-left:2px;}
+  .kpi-note{font-size:11px;color:var(--muted-2);margin-top:6px;}
+
+  /* ---- panels ---- */
+  .grid-2{display:grid;grid-template-columns:1.6fr 1fr;gap:16px;margin-bottom:16px;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:18px 20px;}
+  .panel-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px;flex-wrap:wrap;gap:6px;}
+  .panel-title{font-size:14.5px;font-weight:600;color:var(--ink);}
+  .panel-title .num{color:var(--red);font-family:'IBM Plex Mono',monospace;font-size:11px;margin-right:6px;}
+  .panel-desc{font-size:11.5px;color:var(--muted-2);}
+  .chart-box{position:relative;height:280px;}
+  .chart-box.small{height:230px;}
+
+  /* ---- ranking bars ---- */
+  .rank-row{display:grid;grid-template-columns:150px 1fr 78px;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line-soft);}
+  .rank-row:last-child{border-bottom:none;}
+  .rank-name{font-size:12px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .rank-track{background:var(--panel-2);border-radius:2px;height:14px;overflow:hidden;border:1px solid var(--line-soft);}
+  .rank-fill{height:100%;background:linear-gradient(90deg,var(--red),var(--red-dark));}
+  .rank-val{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--muted);text-align:right;}
+
+  /* ---- table ---- */
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  th{
+    text-align:right;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--muted-2);font-weight:500;padding:8px 10px;border-bottom:2px solid var(--ink);
+  }
+  th:first-child, td:first-child{text-align:left;}
+  td{text-align:right;padding:9px 10px;border-bottom:1px solid var(--line-soft);font-family:'IBM Plex Mono',monospace;color:var(--ink);}
+  td:first-child{font-family:'Inter',sans-serif;color:var(--ink);font-weight:500;}
+  tr:hover td{background:var(--panel-2);}
+  td.muted, th.muted{color:var(--muted-2);}
+  .bar-cell{display:flex;align-items:center;gap:8px;justify-content:flex-end;}
+  .mini-bar{width:60px;height:6px;border-radius:2px;background:var(--panel-2);overflow:hidden;border:1px solid var(--line-soft);}
+  .mini-bar i{display:block;height:100%;background:var(--red);}
+
+  /* ---- ROI calculator ---- */
+  .roi{margin-top:16px;border-left:3px solid var(--red);}
+  .roi-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+  .field{margin-bottom:14px;}
+  .field label{display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:6px;}
+  .field label span{color:var(--red-dark);font-weight:600;}
+  select, input[type=range], input[type=number]{
+    width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:3px;color:var(--ink);
+    padding:8px 10px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;
+  }
+  input[type=range]{padding:0;height:26px;accent-color:var(--red);}
+  .roi-results{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .roi-card{background:var(--panel-2);border:1px solid var(--line);border-radius:3px;padding:12px 14px;}
+  .roi-card .l{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2);}
+  .roi-card .v{font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:600;margin-top:5px;color:var(--ink);}
+  .roi-card.hi .v{color:#1b7a4a;}
+  .roi-card.warn .v{color:var(--red-dark);}
+
+  footer{margin-top:30px;padding-top:18px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;color:var(--muted-2);font-size:11px;font-family:'IBM Plex Mono',monospace;}
+  footer img{height:16px;opacity:.75;}
+
+  @media (max-width: 980px){
+    .kpis{grid-template-columns:repeat(2,1fr);}
+    .grid-2{grid-template-columns:1fr;}
+    .roi-grid{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+<div class="topbar"></div>
+<div class="wrap">
+
+  <header>
+    <div class="head-left">
+      <div class="logo-row">
+        <img src="data:image/png;base64,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" alt="Binswanger Perú">
+        <div class="logo-divider"></div>
+        <span class="doc-tag">Informe técnico · Energía</span>
+      </div>
+      <div>
+        <h1>Diagnóstico de penalidad por energía reactiva</h1>
+        <div class="sub">Consumo (kVARh) y facturación (S/) por exceso de energía reactiva inductiva y capacitiva, por inmueble — Grupo Patio. Base para evaluar propuestas de bancos de condensadores y su retorno de inversión.</div>
+      </div>
+    </div>
+    <div class="period">Periodo analizado<b id="periodLabel">—</b></div>
+  </header>
+
+  <div class="filters">
+    <div class="filter-row">
+      <span class="filter-label">Inmueble</span>
+      <div id="chipsInmueble" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+    </div>
+    <div class="filter-row">
+      <span class="filter-label">Año</span>
+      <div id="chipsAnio" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+    </div>
+  </div>
+
+  <div class="kpis" id="kpiRow"></div>
+
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title"><span class="num">01</span>Facturación mensual y acumulado</div>
+        <div class="panel-desc">Barras: penalidad mensual (S/) · Línea: penalidad acumulada del periodo</div>
+      </div>
+      <div class="chart-box"><canvas id="chartTime"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title"><span class="num">02</span>Inductiva vs. capacitiva</div>
+        <div class="panel-desc">Composición de la facturación acumulada</div>
+      </div>
+      <div class="chart-box small"><canvas id="chartSplit"></canvas></div>
+      <div id="splitLegend" style="margin-top:10px;font-size:12px;color:var(--muted);"></div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="grid-template-columns:1fr;">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title"><span class="num">03</span>Ranking de inmuebles por penalidad acumulada</div>
+        <div class="panel-desc">Prioriza dónde instalar o mantener bancos de condensadores</div>
+      </div>
+      <div id="rankList"></div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-bottom:16px;">
+    <div class="panel-head">
+      <div class="panel-title"><span class="num">04</span>Detalle por inmueble</div>
+      <div class="panel-desc">Acumulado del periodo filtrado</div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Inmueble</th>
+          <th>Meses c/ penalidad</th>
+          <th>kVARh acum.</th>
+          <th>S/ inductiva</th>
+          <th>S/ capacitiva</th>
+          <th>S/ total</th>
+          <th>Prom. mensual</th>
+          <th>Proyección anual</th>
+          <th style="width:90px;">Peso</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <div class="panel roi">
+    <div class="panel-head">
+      <div class="panel-title"><span class="num">05</span>Calculadora de retorno — banco de condensadores</div>
+      <div class="panel-desc">Estimación simple de payback a partir del ritmo de penalidad actual del inmueble seleccionado</div>
+    </div>
+    <div class="roi-grid">
+      <div>
+        <div class="field">
+          <label>Inmueble a evaluar</label>
+          <select id="roiInmueble"></select>
+        </div>
+        <div class="field">
+          <label>Inversión estimada (CAPEX) <span id="roiCapexVal">S/ 15,000</span></label>
+          <input type="range" id="roiCapex" min="500" max="20000" step="250" value="15000">
+        </div>
+        <div class="field">
+          <label>Reducción esperada de penalidad <span id="roiPctVal">95%</span></label>
+          <input type="range" id="roiPct" min="50" max="100" step="1" value="95">
+        </div>
+        <div class="field" style="font-size:11.5px;color:var(--muted-2);line-height:1.5;">
+          El ritmo anualizado se calcula con los últimos 12 meses de facturación reactiva disponibles para el inmueble (o el total del periodo si hay menos de 12 meses de historial).
+        </div>
+      </div>
+      <div class="roi-results">
+        <div class="roi-card">
+          <div class="l">Penalidad anualizada actual</div>
+          <div class="v" id="roiAnual">—</div>
+        </div>
+        <div class="roi-card hi">
+          <div class="l">Ahorro anual estimado</div>
+          <div class="v" id="roiAhorro">—</div>
+        </div>
+        <div class="roi-card warn">
+          <div class="l">Payback estimado</div>
+          <div class="v" id="roiPayback">—</div>
+        </div>
+        <div class="roi-card hi">
+          <div class="l">Ahorro neto a 5 años</div>
+          <div class="v" id="roiNeto5">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span>Fuente: registros de facturación de energía reactiva por inmueble, Grupo Patio</span>
+    <span>Elaborado por Giancarlo Ochoa — Analista Eléctrico — Binswanger Perú</span>
+  </footer>
+</div>
+
+<script>
+const RAW = [{"inmueble": "CRYSTAL REALTY 1- ABTAO", "anio": 2025, "mes": 1, "fecha": "2025-01", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 315.79, "cap_sol": 34.42, "total_kvarh": 315.79, "total_sol": 34.42}, {"inmueble": "CRYSTAL REALTY 1- ABTAO", "anio": 2025, "mes": 2, "fecha": "2025-02", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 440.25, "cap_sol": 47.24, "total_kvarh": 440.25, "total_sol": 47.24}, {"inmueble": "CRYSTAL REALTY 1- ABTAO", "anio": 2025, "mes": 3, "fecha": "2025-03", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 515.36, "cap_sol": 55.2, "total_kvarh": 515.36, "total_sol": 55.2}, {"inmueble": "CRYSTAL REALTY 1- ABTAO", "anio": 2025, "mes": 4, "fecha": "2025-04", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 600.55, "cap_sol": 64.32, "total_kvarh": 600.55, "total_sol": 64.32}, {"inmueble": "CRYSTAL REALTY 1- ABTAO", "anio": 2025, "mes": 5, "fecha": "2025-05", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 1004.28, "cap_sol": 106.25, "total_kvarh": 1004.28, "total_sol": 106.25}, {"inmueble": "CRYSTAL REALTY 1- ABTAO", "anio": 2025, "mes": 6, "fecha": "2025-06", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 884.4, "cap_sol": 93.39, "total_kvarh": 884.4, "total_sol": 93.39}, {"inmueble": "CRYSTAL REALTY 1- ABTAO", "anio": 2025, "mes": 7, "fecha": "2025-07", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 727.53, "cap_sol": 74.43, "total_kvarh": 727.53, "total_sol": 74.43}, {"inmueble": "CRYSTAL REALTY 1- ABTAO", "anio": 2025, "mes": 8, "fecha": "2025-08", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 918.18, "cap_sol": 94.39, "total_kvarh": 918.18, "total_sol": 94.39}, {"inmueble": "CRYSTAL REALTY 1- ABTAO", "anio": 2025, "mes": 9, "fecha": "2025-09", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 815.7, "cap_sol": 84.02, "total_kvarh": 815.7, "total_sol": 84.02}, {"inmueble": "CRYSTAL REALTY 1- ABTAO", "anio": 2025, "mes": 10, "fecha": "2025-10", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 727.08, "cap_sol": 72.78, "total_kvarh": 727.08, "total_sol": 72.78}, {"inmueble": "CRYSTAL REALTY 1- ABTAO", "anio": 2025, "mes": 11, "fecha": "2025-11", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 727.42, "cap_sol": 70.63, "total_kvarh": 727.42, "total_sol": 70.63}, {"inmueble": "CRYSTAL REALTY 1- ABTAO", "anio": 2025, "mes": 12, "fecha": "2025-12", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 671.31, "cap_sol": 65.05, "total_kvarh": 671.31, "total_sol": 65.05}, {"inmueble": "CRYSTAL REALTY 1- ABTAO", "anio": 2026, "mes": 1, "fecha": "2026-01", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 443.69, "cap_sol": 42.99, "total_kvarh": 443.69, "total_sol": 42.99}, {"inmueble": "CRYSTAL REALTY 1- ABTAO", "anio": 2026, "mes": 2, "fecha": "2026-02", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 373.04, "cap_sol": 35.89, "total_kvarh": 373.04, "total_sol": 35.89}, {"inmueble": "CRYSTAL REALTY 1- ABTAO", "anio": 2026, "mes": 3, "fecha": "2026-03", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 451.47, "cap_sol": 43.43, "total_kvarh": 451.47, "total_sol": 43.43}, {"inmueble": "CRYSTAL REALTY 1- ABTAO", "anio": 2026, "mes": 4, "fecha": "2026-04", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 528.3, "cap_sol": 52.78, "total_kvarh": 528.3, "total_sol": 52.78}, {"inmueble": "CRYSTAL REALTY 1- ABTAO", "anio": 2026, "mes": 5, "fecha": "2026-05", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 534.37, "cap_sol": 53.86, "total_kvarh": 534.37, "total_sol": 53.86}, {"inmueble": "CRYSTAL REALTY 1- ABTAO", "anio": 2026, "mes": 6, "fecha": "2026-06", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 734.17, "cap_sol": 74.0, "total_kvarh": 734.17, "total_sol": 74.0}, {"inmueble": "CRYSTAL REALTY 2 - CAMELIAS", "anio": 2025, "mes": 4, "fecha": "2025-04", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 7678.37, "cap_sol": 822.35, "total_kvarh": 7678.37, "total_sol": 822.35}, {"inmueble": "CRYSTAL REALTY 2 - CAMELIAS", "anio": 2025, "mes": 5, "fecha": "2025-05", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 8714.48, "cap_sol": 921.99, "total_kvarh": 8714.48, "total_sol": 921.99}, {"inmueble": "CRYSTAL REALTY 2 - CAMELIAS", "anio": 2025, "mes": 6, "fecha": "2025-06", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 8500.48, "cap_sol": 897.65, "total_kvarh": 8500.48, "total_sol": 897.65}, {"inmueble": "CRYSTAL REALTY 2 - CAMELIAS", "anio": 2025, "mes": 7, "fecha": "2025-07", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 8278.58, "cap_sol": 846.9, "total_kvarh": 8278.58, "total_sol": 846.9}, {"inmueble": "CRYSTAL REALTY 2 - CAMELIAS", "anio": 2025, "mes": 8, "fecha": "2025-08", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 9346.52, "cap_sol": 960.82, "total_kvarh": 9346.52, "total_sol": 960.82}, {"inmueble": "CRYSTAL REALTY 2 - CAMELIAS", "anio": 2025, "mes": 9, "fecha": "2025-09", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 9005.42, "cap_sol": 927.56, "total_kvarh": 9005.42, "total_sol": 927.56}, {"inmueble": "CRYSTAL REALTY 2 - CAMELIAS", "anio": 2025, "mes": 10, "fecha": "2025-10", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 8780.32, "cap_sol": 878.91, "total_kvarh": 8780.32, "total_sol": 878.91}, {"inmueble": "CRYSTAL REALTY 2 - CAMELIAS", "anio": 2025, "mes": 11, "fecha": "2025-11", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 8868.94, "cap_sol": 861.17, "total_kvarh": 8868.94, "total_sol": 861.17}, {"inmueble": "CRYSTAL REALTY 2 - CAMELIAS", "anio": 2025, "mes": 12, "fecha": "2025-12", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 8225.34, "cap_sol": 797.04, "total_kvarh": 8225.34, "total_sol": 797.04}, {"inmueble": "CRYSTAL REALTY 2 - CAMELIAS", "anio": 2026, "mes": 1, "fecha": "2026-01", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 7539.14, "cap_sol": 730.54, "total_kvarh": 7539.14, "total_sol": 730.54}, {"inmueble": "CRYSTAL REALTY 2 - CAMELIAS", "anio": 2026, "mes": 2, "fecha": "2026-02", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 6141.89, "cap_sol": 590.85, "total_kvarh": 6141.89, "total_sol": 590.85}, {"inmueble": "CRYSTAL REALTY 2 - CAMELIAS", "anio": 2026, "mes": 3, "fecha": "2026-03", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 5527.14, "cap_sol": 531.71, "total_kvarh": 5527.14, "total_sol": 531.71}, {"inmueble": "CRYSTAL REALTY 2 - CAMELIAS", "anio": 2026, "mes": 4, "fecha": "2026-04", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 6041.02, "cap_sol": 603.5, "total_kvarh": 6041.02, "total_sol": 603.5}, {"inmueble": "CRYSTAL REALTY 2 - CAMELIAS", "anio": 2026, "mes": 5, "fecha": "2026-05", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 7955.46, "cap_sol": 801.91, "total_kvarh": 7955.46, "total_sol": 801.91}, {"inmueble": "CRYSTAL REALTY 2 - CAMELIAS", "anio": 2026, "mes": 6, "fecha": "2026-06", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 7525.4, "cap_sol": 758.56, "total_kvarh": 7525.4, "total_sol": 758.56}, {"inmueble": "GRUPO PATIO OFICINAS S.A.C - CENTRIC", "anio": 2024, "mes": 12, "fecha": "2024-12", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 417.24, "cap_sol": 45.48, "total_kvarh": 417.24, "total_sol": 45.48}, {"inmueble": "GRUPO PATIO OFICINAS S.A.C - CENTRIC", "anio": 2025, "mes": 1, "fecha": "2025-01", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 227.17, "cap_sol": 24.76, "total_kvarh": 227.17, "total_sol": 24.76}, {"inmueble": "GRUPO PATIO OFICINAS S.A.C - CENTRIC", "anio": 2025, "mes": 2, "fecha": "2025-02", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 374.42, "cap_sol": 40.18, "total_kvarh": 374.42, "total_sol": 40.18}, {"inmueble": "GRUPO PATIO OFICINAS S.A.C - CENTRIC", "anio": 2025, "mes": 3, "fecha": "2025-03", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 448.61, "cap_sol": 48.05, "total_kvarh": 448.61, "total_sol": 48.05}, {"inmueble": "GRUPO PATIO OFICINAS S.A.C - CENTRIC", "anio": 2025, "mes": 4, "fecha": "2025-04", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 334.23, "cap_sol": 35.8, "total_kvarh": 334.23, "total_sol": 35.8}, {"inmueble": "GRUPO PATIO OFICINAS S.A.C - CENTRIC", "anio": 2025, "mes": 5, "fecha": "2025-05", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 401.55, "cap_sol": 42.48, "total_kvarh": 401.55, "total_sol": 42.48}, {"inmueble": "GRUPO PATIO OFICINAS S.A.C - CENTRIC", "anio": 2025, "mes": 6, "fecha": "2025-06", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 523.95, "cap_sol": 55.33, "total_kvarh": 523.95, "total_sol": 55.33}, {"inmueble": "GRUPO PATIO OFICINAS S.A.C - CENTRIC", "anio": 2025, "mes": 7, "fecha": "2025-07", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 510.78, "cap_sol": 52.25, "total_kvarh": 510.78, "total_sol": 52.25}, {"inmueble": "GRUPO PATIO OFICINAS S.A.C - CENTRIC", "anio": 2025, "mes": 8, "fecha": "2025-08", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 671.66, "cap_sol": 69.05, "total_kvarh": 671.66, "total_sol": 69.05}, {"inmueble": "GRUPO PATIO OFICINAS S.A.C - CENTRIC", "anio": 2025, "mes": 9, "fecha": "2025-09", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 488.34, "cap_sol": 50.3, "total_kvarh": 488.34, "total_sol": 50.3}, {"inmueble": "GRUPO PATIO OFICINAS S.A.C - CENTRIC", "anio": 2025, "mes": 10, "fecha": "2025-10", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 80.04, "cap_sol": 8.01, "total_kvarh": 80.04, "total_sol": 8.01}, {"inmueble": "GRUPO PATIO OFICINAS S.A.C - CENTRIC", "anio": 2025, "mes": 11, "fecha": "2025-11", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 133.85, "cap_sol": 13.0, "total_kvarh": 133.85, "total_sol": 13.0}, {"inmueble": "GRUPO PATIO OFICINAS S.A.C - CENTRIC", "anio": 2025, "mes": 12, "fecha": "2025-12", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 110.26, "cap_sol": 10.68, "total_kvarh": 110.26, "total_sol": 10.68}, {"inmueble": "GRUPO PATIO OFICINAS S.A.C - CENTRIC", "anio": 2026, "mes": 1, "fecha": "2026-01", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 225.91, "cap_sol": 21.89, "total_kvarh": 225.91, "total_sol": 21.89}, {"inmueble": "GRUPO PATIO OFICINAS S.A.C - CENTRIC", "anio": 2026, "mes": 2, "fecha": "2026-02", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 181.37, "cap_sol": 17.45, "total_kvarh": 181.37, "total_sol": 17.45}, {"inmueble": "GRUPO PATIO OFICINAS S.A.C - CENTRIC", "anio": 2026, "mes": 3, "fecha": "2026-03", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 615.21, "cap_sol": 59.18, "total_kvarh": 615.21, "total_sol": 59.18}, {"inmueble": "GRUPO PATIO OFICINAS S.A.C - CENTRIC", "anio": 2026, "mes": 4, "fecha": "2026-04", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 417.81, "cap_sol": 41.74, "total_kvarh": 417.81, "total_sol": 41.74}, {"inmueble": "GRUPO PATIO OFICINAS S.A.C - CENTRIC", "anio": 2026, "mes": 5, "fecha": "2026-05", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 164.99, "cap_sol": 16.63, "total_kvarh": 164.99, "total_sol": 16.63}, {"inmueble": "GRUPO PATIO OFICINAS S.A.C - CENTRIC", "anio": 2026, "mes": 6, "fecha": "2026-06", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 208.05, "cap_sol": 20.97, "total_kvarh": 208.05, "total_sol": 20.97}, {"inmueble": "HUACHO", "anio": 2024, "mes": 12, "fecha": "2024-12", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "HUACHO", "anio": 2025, "mes": 1, "fecha": "2025-01", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "HUACHO", "anio": 2025, "mes": 2, "fecha": "2025-02", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "HUACHO", "anio": 2025, "mes": 3, "fecha": "2025-03", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "HUACHO", "anio": 2025, "mes": 4, "fecha": "2025-04", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "HUACHO", "anio": 2025, "mes": 5, "fecha": "2025-05", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "HUACHO", "anio": 2025, "mes": 6, "fecha": "2025-06", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "HUACHO", "anio": 2025, "mes": 7, "fecha": "2025-07", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "HUACHO", "anio": 2025, "mes": 8, "fecha": "2025-08", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "HUACHO", "anio": 2025, "mes": 9, "fecha": "2025-09", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "HUACHO", "anio": 2025, "mes": 10, "fecha": "2025-10", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "HUACHO", "anio": 2025, "mes": 11, "fecha": "2025-11", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "HUACHO", "anio": 2025, "mes": 12, "fecha": "2025-12", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "HUACHO", "anio": 2026, "mes": 1, "fecha": "2026-01", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "HUACHO", "anio": 2026, "mes": 2, "fecha": "2026-02", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "HUACHO", "anio": 2026, "mes": 3, "fecha": "2026-03", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "HUACHO", "anio": 2026, "mes": 4, "fecha": "2026-04", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "HUACHO", "anio": 2026, "mes": 5, "fecha": "2026-05", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "HUACHO", "anio": 2026, "mes": 6, "fecha": "2026-06", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 1791.39, "cap_sol": 180.57, "total_kvarh": 1791.39, "total_sol": 180.57}, {"inmueble": "ICA 1", "anio": 2024, "mes": 12, "fecha": "2024-12", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "ICA 1", "anio": 2025, "mes": 1, "fecha": "2025-01", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "ICA 1", "anio": 2025, "mes": 2, "fecha": "2025-02", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "ICA 1", "anio": 2025, "mes": 3, "fecha": "2025-03", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "ICA 1", "anio": 2025, "mes": 4, "fecha": "2025-04", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "ICA 1", "anio": 2025, "mes": 5, "fecha": "2025-05", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "ICA 1", "anio": 2025, "mes": 6, "fecha": "2025-06", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "ICA 1", "anio": 2025, "mes": 7, "fecha": "2025-07", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "ICA 1", "anio": 2025, "mes": 8, "fecha": "2025-08", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "ICA 1", "anio": 2025, "mes": 9, "fecha": "2025-09", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "ICA 1", "anio": 2025, "mes": 10, "fecha": "2025-10", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "ICA 1", "anio": 2025, "mes": 11, "fecha": "2025-11", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "ICA 1", "anio": 2025, "mes": 12, "fecha": "2025-12", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "ICA 1", "anio": 2026, "mes": 1, "fecha": "2026-01", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "ICA 1", "anio": 2026, "mes": 2, "fecha": "2026-02", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "ICA 1", "anio": 2026, "mes": 3, "fecha": "2026-03", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "ICA 1", "anio": 2026, "mes": 4, "fecha": "2026-04", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "ICA 1", "anio": 2026, "mes": 5, "fecha": "2026-05", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "ICA 1", "anio": 2026, "mes": 6, "fecha": "2026-06", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 0.0, "total_sol": 0.0}, {"inmueble": "ICA 2", "anio": 2024, "mes": 12, "fecha": "2024-12", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 72.82, "cap_sol": 7.94, "total_kvarh": 72.82, "total_sol": 7.94}, {"inmueble": "ICA 2", "anio": 2025, "mes": 1, "fecha": "2025-01", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 16.55, "cap_sol": 1.8, "total_kvarh": 16.55, "total_sol": 1.8}, {"inmueble": "ICA 2", "anio": 2025, "mes": 2, "fecha": "2025-02", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 305.13, "cap_sol": 32.74, "total_kvarh": 305.13, "total_sol": 32.74}, {"inmueble": "ICA 2", "anio": 2025, "mes": 3, "fecha": "2025-03", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 190.75, "cap_sol": 20.43, "total_kvarh": 190.75, "total_sol": 20.43}, {"inmueble": "ICA 2", "anio": 2025, "mes": 4, "fecha": "2025-04", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 186.08, "cap_sol": 19.93, "total_kvarh": 186.08, "total_sol": 19.93}, {"inmueble": "ICA 2", "anio": 2025, "mes": 5, "fecha": "2025-05", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 238.16, "cap_sol": 25.2, "total_kvarh": 238.16, "total_sol": 25.2}, {"inmueble": "ICA 2", "anio": 2025, "mes": 6, "fecha": "2025-06", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 501.94, "cap_sol": 53.0, "total_kvarh": 501.94, "total_sol": 53.0}, {"inmueble": "ICA 2", "anio": 2025, "mes": 7, "fecha": "2025-07", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 356.2, "cap_sol": 36.44, "total_kvarh": 356.2, "total_sol": 36.44}, {"inmueble": "ICA 2", "anio": 2025, "mes": 8, "fecha": "2025-08", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 1370.47, "cap_sol": 140.88, "total_kvarh": 1370.47, "total_sol": 140.88}, {"inmueble": "ICA 2", "anio": 2025, "mes": 9, "fecha": "2025-09", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 86.28, "cap_sol": 8.89, "total_kvarh": 86.28, "total_sol": 8.89}, {"inmueble": "ICA 2", "anio": 2025, "mes": 10, "fecha": "2025-10", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 78.74, "cap_sol": 7.88, "total_kvarh": 78.74, "total_sol": 7.88}, {"inmueble": "ICA 2", "anio": 2025, "mes": 11, "fecha": "2025-11", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 6.89, "cap_sol": 0.67, "total_kvarh": 6.89, "total_sol": 0.67}, {"inmueble": "ICA 2", "anio": 2025, "mes": 12, "fecha": "2025-12", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 167.13, "cap_sol": 16.19, "total_kvarh": 167.13, "total_sol": 16.19}, {"inmueble": "ICA 2", "anio": 2026, "mes": 1, "fecha": "2026-01", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 467.0, "cap_sol": 45.25, "total_kvarh": 467.0, "total_sol": 45.25}, {"inmueble": "ICA 2", "anio": 2026, "mes": 2, "fecha": "2026-02", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 56.08, "cap_sol": 5.39, "total_kvarh": 56.08, "total_sol": 5.39}, {"inmueble": "ICA 2", "anio": 2026, "mes": 3, "fecha": "2026-03", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 6.81, "cap_sol": 0.66, "total_kvarh": 6.81, "total_sol": 0.66}, {"inmueble": "ICA 2", "anio": 2026, "mes": 4, "fecha": "2026-04", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 16.55, "cap_sol": 1.65, "total_kvarh": 16.55, "total_sol": 1.65}, {"inmueble": "ICA 2", "anio": 2026, "mes": 5, "fecha": "2026-05", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 203.98, "cap_sol": 20.56, "total_kvarh": 203.98, "total_sol": 20.56}, {"inmueble": "ICA 2", "anio": 2026, "mes": 6, "fecha": "2026-06", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 254.35, "cap_sol": 25.64, "total_kvarh": 254.35, "total_sol": 25.64}, {"inmueble": "INMOBILIARIA MARATON", "anio": 2024, "mes": 12, "fecha": "2024-12", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 1206.57, "cap_sol": 131.52, "total_kvarh": 1206.57, "total_sol": 131.52}, {"inmueble": "INMOBILIARIA MARATON", "anio": 2025, "mes": 1, "fecha": "2025-01", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 975.09, "cap_sol": 106.28, "total_kvarh": 975.09, "total_sol": 106.28}, {"inmueble": "INMOBILIARIA MARATON", "anio": 2025, "mes": 2, "fecha": "2025-02", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 820.15, "cap_sol": 88.0, "total_kvarh": 820.15, "total_sol": 88.0}, {"inmueble": "INMOBILIARIA MARATON", "anio": 2025, "mes": 3, "fecha": "2025-03", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 938.56, "cap_sol": 100.52, "total_kvarh": 938.56, "total_sol": 100.52}, {"inmueble": "INMOBILIARIA MARATON", "anio": 2025, "mes": 4, "fecha": "2025-04", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 1346.3, "cap_sol": 144.19, "total_kvarh": 1346.3, "total_sol": 144.19}, {"inmueble": "INMOBILIARIA MARATON", "anio": 2025, "mes": 5, "fecha": "2025-05", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 2328.89, "cap_sol": 246.4, "total_kvarh": 2328.89, "total_sol": 246.4}, {"inmueble": "INMOBILIARIA MARATON", "anio": 2025, "mes": 6, "fecha": "2025-06", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 2816.17, "cap_sol": 297.39, "total_kvarh": 2816.17, "total_sol": 297.39}, {"inmueble": "INMOBILIARIA MARATON", "anio": 2025, "mes": 7, "fecha": "2025-07", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 3032.53, "cap_sol": 310.23, "total_kvarh": 3032.53, "total_sol": 310.23}, {"inmueble": "INMOBILIARIA MARATON", "anio": 2025, "mes": 8, "fecha": "2025-08", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 3126.2, "cap_sol": 321.37, "total_kvarh": 3126.2, "total_sol": 321.37}, {"inmueble": "INMOBILIARIA MARATON", "anio": 2025, "mes": 9, "fecha": "2025-09", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 2782.51, "cap_sol": 286.6, "total_kvarh": 2782.51, "total_sol": 286.6}, {"inmueble": "INMOBILIARIA MARATON", "anio": 2025, "mes": 10, "fecha": "2025-10", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 2471.79, "cap_sol": 247.43, "total_kvarh": 2471.79, "total_sol": 247.43}, {"inmueble": "INMOBILIARIA MARATON", "anio": 2025, "mes": 11, "fecha": "2025-11", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 2370.98, "cap_sol": 230.22, "total_kvarh": 2370.98, "total_sol": 230.22}, {"inmueble": "INMOBILIARIA MARATON", "anio": 2025, "mes": 12, "fecha": "2025-12", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 1725.86, "cap_sol": 167.24, "total_kvarh": 1725.86, "total_sol": 167.24}, {"inmueble": "INMOBILIARIA MARATON", "anio": 2026, "mes": 1, "fecha": "2026-01", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 598.15, "cap_sol": 57.96, "total_kvarh": 598.15, "total_sol": 57.96}, {"inmueble": "INMOBILIARIA MARATON", "anio": 2026, "mes": 2, "fecha": "2026-02", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 698.22, "cap_sol": 67.17, "total_kvarh": 698.22, "total_sol": 67.17}, {"inmueble": "INMOBILIARIA MARATON", "anio": 2026, "mes": 3, "fecha": "2026-03", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 737.57, "cap_sol": 70.95, "total_kvarh": 737.57, "total_sol": 70.95}, {"inmueble": "INMOBILIARIA MARATON", "anio": 2026, "mes": 4, "fecha": "2026-04", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 1133.81, "cap_sol": 113.27, "total_kvarh": 1133.81, "total_sol": 113.27}, {"inmueble": "INMOBILIARIA MARATON", "anio": 2026, "mes": 5, "fecha": "2026-05", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 1380.08, "cap_sol": 139.11, "total_kvarh": 1380.08, "total_sol": 139.11}, {"inmueble": "INMOBILIARIA MARATON", "anio": 2026, "mes": 6, "fecha": "2026-06", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 1732.98, "cap_sol": 174.68, "total_kvarh": 1732.98, "total_sol": 174.68}, {"inmueble": "PIURA - PLAZA DE LA LUNA", "anio": 2024, "mes": 12, "fecha": "2024-12", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 257.1, "cap_sol": 25.09, "total_kvarh": 257.1, "total_sol": 25.09}, {"inmueble": "PIURA - PLAZA DE LA LUNA", "anio": 2025, "mes": 1, "fecha": "2025-01", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 119.55, "cap_sol": 11.67, "total_kvarh": 119.55, "total_sol": 11.67}, {"inmueble": "PIURA - PLAZA DE LA LUNA", "anio": 2025, "mes": 2, "fecha": "2025-02", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 30.3, "cap_sol": 2.91, "total_kvarh": 30.3, "total_sol": 2.91}, {"inmueble": "PIURA - PLAZA DE LA LUNA", "anio": 2025, "mes": 3, "fecha": "2025-03", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 174.45, "cap_sol": 16.75, "total_kvarh": 174.45, "total_sol": 16.75}, {"inmueble": "PIURA - PLAZA DE LA LUNA", "anio": 2025, "mes": 4, "fecha": "2025-04", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 489.75, "cap_sol": 47.02, "total_kvarh": 489.75, "total_sol": 47.02}, {"inmueble": "PIURA - PLAZA DE LA LUNA", "anio": 2025, "mes": 5, "fecha": "2025-05", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 1042.5, "cap_sol": 98.93, "total_kvarh": 1042.5, "total_sol": 98.93}, {"inmueble": "PIURA - PLAZA DE LA LUNA", "anio": 2025, "mes": 6, "fecha": "2025-06", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 981.9, "cap_sol": 92.99, "total_kvarh": 981.9, "total_sol": 92.99}, {"inmueble": "PIURA - PLAZA DE LA LUNA", "anio": 2025, "mes": 7, "fecha": "2025-07", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 625.65, "cap_sol": 57.43, "total_kvarh": 625.65, "total_sol": 57.43}, {"inmueble": "PIURA - PLAZA DE LA LUNA", "anio": 2025, "mes": 8, "fecha": "2025-08", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 1478.25, "cap_sol": 136.44, "total_kvarh": 1478.25, "total_sol": 136.44}, {"inmueble": "PIURA - PLAZA DE LA LUNA", "anio": 2025, "mes": 9, "fecha": "2025-09", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 1437.3, "cap_sol": 132.66, "total_kvarh": 1437.3, "total_sol": 132.66}, {"inmueble": "PIURA - PLAZA DE LA LUNA", "anio": 2025, "mes": 10, "fecha": "2025-10", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 1456.95, "cap_sol": 130.69, "total_kvarh": 1456.95, "total_sol": 130.69}, {"inmueble": "PIURA - PLAZA DE LA LUNA", "anio": 2025, "mes": 11, "fecha": "2025-11", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 757.35, "cap_sol": 66.04, "total_kvarh": 757.35, "total_sol": 66.04}, {"inmueble": "PIURA - PLAZA DE LA LUNA", "anio": 2025, "mes": 12, "fecha": "2025-12", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 383.25, "cap_sol": 33.34, "total_kvarh": 383.25, "total_sol": 33.34}, {"inmueble": "PIURA - PLAZA DE LA LUNA", "anio": 2026, "mes": 1, "fecha": "2026-01", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 262.95, "cap_sol": 22.88, "total_kvarh": 262.95, "total_sol": 22.88}, {"inmueble": "PIURA - PLAZA DE LA LUNA", "anio": 2026, "mes": 2, "fecha": "2026-02", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 99.45, "cap_sol": 8.59, "total_kvarh": 99.45, "total_sol": 8.59}, {"inmueble": "PIURA - PLAZA DE LA LUNA", "anio": 2026, "mes": 3, "fecha": "2026-03", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 18.15, "cap_sol": 1.57, "total_kvarh": 18.15, "total_sol": 1.57}, {"inmueble": "PIURA - PLAZA DE LA LUNA", "anio": 2026, "mes": 4, "fecha": "2026-04", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 208.35, "cap_sol": 18.65, "total_kvarh": 208.35, "total_sol": 18.65}, {"inmueble": "PIURA - PLAZA DE LA LUNA", "anio": 2026, "mes": 5, "fecha": "2026-05", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 674.4, "cap_sol": 60.9, "total_kvarh": 674.4, "total_sol": 60.9}, {"inmueble": "PIURA - PLAZA DE LA LUNA", "anio": 2026, "mes": 6, "fecha": "2026-06", "ind_kvarh": 0.0, "ind_sol": 0.0, "cap_kvarh": 495.15, "cap_sol": 44.71, "total_kvarh": 495.15, "total_sol": 44.71}, {"inmueble": "PIURA - PLAZA DEL SOL", "anio": 2024, "mes": 12, "fecha": "2024-12", "ind_kvarh": 14752.35, "ind_sol": 719.91, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 14752.35, "total_sol": 719.91}, {"inmueble": "PIURA - PLAZA DEL SOL", "anio": 2025, "mes": 1, "fecha": "2025-01", "ind_kvarh": 17130.01, "ind_sol": 835.94, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 17130.01, "total_sol": 835.94}, {"inmueble": "PIURA - PLAZA DEL SOL", "anio": 2025, "mes": 2, "fecha": "2025-02", "ind_kvarh": 15572.52, "ind_sol": 749.04, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 15572.52, "total_sol": 749.04}, {"inmueble": "PIURA - PLAZA DEL SOL", "anio": 2025, "mes": 3, "fecha": "2025-03", "ind_kvarh": 18520.32, "ind_sol": 888.98, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 18520.32, "total_sol": 888.98}, {"inmueble": "PIURA - PLAZA DEL SOL", "anio": 2025, "mes": 4, "fecha": "2025-04", "ind_kvarh": 14584.41, "ind_sol": 700.05, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 14584.41, "total_sol": 700.05}, {"inmueble": "PIURA - PLAZA DEL SOL", "anio": 2025, "mes": 5, "fecha": "2025-05", "ind_kvarh": 12623.02, "ind_sol": 598.33, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 12623.02, "total_sol": 598.33}, {"inmueble": "PIURA - PLAZA DEL SOL", "anio": 2025, "mes": 6, "fecha": "2025-06", "ind_kvarh": 9979.43, "ind_sol": 472.03, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 9979.43, "total_sol": 472.03}, {"inmueble": "PIURA - PLAZA DEL SOL", "anio": 2025, "mes": 7, "fecha": "2025-07", "ind_kvarh": 9912.51, "ind_sol": 454.98, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 9912.51, "total_sol": 454.98}, {"inmueble": "PIURA - PLAZA DEL SOL", "anio": 2025, "mes": 8, "fecha": "2025-08", "ind_kvarh": 10709.4, "ind_sol": 494.77, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 10709.4, "total_sol": 494.77}, {"inmueble": "PIURA - PLAZA DEL SOL", "anio": 2025, "mes": 9, "fecha": "2025-09", "ind_kvarh": 10461.42, "ind_sol": 483.32, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 10461.42, "total_sol": 483.32}, {"inmueble": "PIURA - PLAZA DEL SOL", "anio": 2025, "mes": 10, "fecha": "2025-10", "ind_kvarh": 10031.99, "ind_sol": 449.43, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 10031.99, "total_sol": 449.43}, {"inmueble": "PIURA - PLAZA DEL SOL", "anio": 2025, "mes": 11, "fecha": "2025-11", "ind_kvarh": 11565.16, "ind_sol": 504.24, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 11565.16, "total_sol": 504.24}, {"inmueble": "PIURA - PLAZA DEL SOL", "anio": 2025, "mes": 12, "fecha": "2025-12", "ind_kvarh": 12028.23, "ind_sol": 523.23, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 12028.23, "total_sol": 523.23}, {"inmueble": "PIURA - PLAZA DEL SOL", "anio": 2026, "mes": 1, "fecha": "2026-01", "ind_kvarh": 13021.19, "ind_sol": 566.42, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 13021.19, "total_sol": 566.42}, {"inmueble": "PIURA - PLAZA DEL SOL", "anio": 2026, "mes": 2, "fecha": "2026-02", "ind_kvarh": 12416.57, "ind_sol": 536.4, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 12416.57, "total_sol": 536.4}, {"inmueble": "PIURA - PLAZA DEL SOL", "anio": 2026, "mes": 3, "fecha": "2026-03", "ind_kvarh": 14396.02, "ind_sol": 621.91, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 14396.02, "total_sol": 621.91}, {"inmueble": "PIURA - PLAZA DEL SOL", "anio": 2026, "mes": 4, "fecha": "2026-04", "ind_kvarh": 13516.98, "ind_sol": 604.21, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 13516.98, "total_sol": 604.21}, {"inmueble": "PIURA - PLAZA DEL SOL", "anio": 2026, "mes": 5, "fecha": "2026-05", "ind_kvarh": 13810.27, "ind_sol": 624.22, "cap_kvarh": 0.0, "cap_sol": 0.0, "total_kvarh": 13810.27, "total_sol": 624.22}, {"inmueble": "PIURA - PLAZA DEL SOL", "anio": 2026, "mes": 6, "fecha": "2026-06", "ind_kvarh": 15447.43, "ind_sol": 698.22, "cap_kvarh": 0.2, "cap_sol": 0.02, "total_kvarh": 15447.630000000001, "total_sol": 698.24}];
+
+const MESES = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const fmtSol = (n) => 'S/ ' + n.toLocaleString('es-PE', {maximumFractionDigits:0});
+const fmtSol2 = (n) => 'S/ ' + n.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
+const fmtKvarh = (n) => n.toLocaleString('es-PE', {maximumFractionDigits:0}) + ' kVARh';
+
+const inmuebles = [...new Set(RAW.map(r=>r.inmueble))].sort();
+const anios = [...new Set(RAW.map(r=>r.anio))].sort();
+
+let state = {
+  inmuebles: new Set(inmuebles),
+  anios: new Set(anios),
+};
+
+// ---- period label ----
+const fechas = [...new Set(RAW.map(r=>r.fecha))].sort();
+document.getElementById('periodLabel').textContent = fechas[0] + '  →  ' + fechas[fechas.length-1];
+
+// ---- build chips ----
+function buildChips(containerId, values, stateSet, labelFn, cls){
+  const el = document.getElementById(containerId);
+  const allChip = document.createElement('div');
+  allChip.className = 'chip active';
+  allChip.textContent = 'Todos';
+  allChip.onclick = () => { values.forEach(v=>stateSet.add(v)); refresh(); };
+  el.appendChild(allChip);
+  values.forEach(v=>{
+    const c = document.createElement('div');
+    c.className = 'chip active' + (cls?(' '+cls):'');
+    c.textContent = labelFn(v);
+    c.onclick = () => {
+      if(stateSet.has(v) && stateSet.size===1){ values.forEach(x=>stateSet.add(x)); }
+      else if(stateSet.has(v)){ stateSet.delete(v); }
+      else { stateSet.add(v); }
+      refresh();
+    };
+    c.dataset.val = v;
+    el.appendChild(c);
+  });
+}
+buildChips('chipsInmueble', inmuebles, state.inmuebles, v=>v.length>28? v.slice(0,26)+'…':v);
+buildChips('chipsAnio', anios, state.anios, v=>String(v), 'blk');
+
+function syncChipUI(){
+  document.querySelectorAll('#chipsInmueble .chip[data-val]').forEach(c=>{
+    c.classList.toggle('active', state.inmuebles.has(c.dataset.val));
+  });
+  document.querySelectorAll('#chipsAnio .chip[data-val]').forEach(c=>{
+    c.classList.toggle('active', state.anios.has(Number(c.dataset.val)));
+  });
+}
+
+// ---- charts refs ----
+let chartTime, chartSplit;
+
+function getFiltered(){
+  return RAW.filter(r => state.inmuebles.has(r.inmueble) && state.anios.has(r.anio));
+}
+
+function computeKPIs(rows){
+  const totalSol = rows.reduce((a,r)=>a+r.total_sol,0);
+  const totalKvarh = rows.reduce((a,r)=>a+r.total_kvarh,0);
+  const indSol = rows.reduce((a,r)=>a+r.ind_sol,0);
+  const capSol = rows.reduce((a,r)=>a+r.cap_sol,0);
+  const months = new Set(rows.map(r=>r.fecha));
+  const avgMonthly = months.size ? totalSol/months.size : 0;
+  const sortedMonths = [...months].sort();
+  const last12 = sortedMonths.slice(-12);
+  const runRateSol = rows.filter(r=>last12.includes(r.fecha)).reduce((a,r)=>a+r.total_sol,0);
+  const runRateAnual = last12.length ? runRateSol/last12.length*12 : 0;
+  return {totalSol, totalKvarh, indSol, capSol, avgMonthly, runRateAnual, nMonths: months.size};
+}
+
+function renderKPIs(k){
+  const items = [
+    {label:'Penalidad acumulada', value: fmtSol(k.totalSol), note: k.nMonths+' meses en el periodo filtrado', accent:'var(--red)'},
+    {label:'Consumo reactivo acumulado', value: fmtKvarh(k.totalKvarh), note:'inductiva + capacitiva', accent:'var(--ink)'},
+    {label:'Promedio mensual', value: fmtSol(k.avgMonthly), note:'S/ por mes, en promedio', accent:'var(--red)'},
+    {label:'Ritmo anualizado (últ. 12m)', value: fmtSol(k.runRateAnual), note:'proyección al ritmo actual', accent:'var(--red-dark)'},
+    {label:'Composición', value: (k.totalSol? Math.round(k.indSol/k.totalSol*100):0)+'% <small>inductiva</small>', note: (k.totalSol? Math.round(k.capSol/k.totalSol*100):0)+'% capacitiva', accent:'var(--ink)'},
+  ];
+  const el = document.getElementById('kpiRow');
+  el.innerHTML = items.map(it=>`
+    <div class="kpi" style="--kpi-accent:${it.accent}">
+      <div class="kpi-label">${it.label}</div>
+      <div class="kpi-value">${it.value}</div>
+      <div class="kpi-note">${it.note}</div>
+    </div>`).join('');
+}
+
+function renderTimeChart(rows){
+  const byMonth = {};
+  rows.forEach(r=>{
+    byMonth[r.fecha] = byMonth[r.fecha] || {ind:0, cap:0};
+    byMonth[r.fecha].ind += r.ind_sol;
+    byMonth[r.fecha].cap += r.cap_sol;
+  });
+  const months = Object.keys(byMonth).sort();
+  const ind = months.map(m=>byMonth[m].ind);
+  const cap = months.map(m=>byMonth[m].cap);
+  let acc = 0;
+  const cum = months.map((m,i)=> acc += (ind[i]+cap[i]));
+  const labels = months.map(m=>{
+    const [y,mo] = m.split('-');
+    return MESES[Number(mo)]+" '"+y.slice(2);
+  });
+
+  if(chartTime) chartTime.destroy();
+  const ctx = document.getElementById('chartTime').getContext('2d');
+  chartTime = new Chart(ctx, {
+    data: {
+      labels,
+      datasets: [
+        {type:'bar', label:'Inductiva (S/)', data:ind, backgroundColor:'#d40032', stack:'s', borderRadius:2, maxBarThickness:22},
+        {type:'bar', label:'Capacitiva (S/)', data:cap, backgroundColor:'#15151a', stack:'s', borderRadius:2, maxBarThickness:22},
+        {type:'line', label:'Acumulado (S/)', data:cum, borderColor:'#9c0026', backgroundColor:'#9c0026', yAxisID:'y1', tension:.3, pointRadius:2, borderWidth:2},
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index', intersect:false},
+      plugins:{
+        legend:{labels:{color:'#6c6b6f', font:{family:'IBM Plex Mono', size:10.5}, boxWidth:10}},
+        tooltip:{backgroundColor:'#15151a', borderColor:'#e2e0dc', borderWidth:1, titleColor:'#ffffff', bodyColor:'#d8d8da', titleFont:{family:'IBM Plex Mono'}, bodyFont:{family:'IBM Plex Mono'}}
+      },
+      scales:{
+        x:{stacked:true, ticks:{color:'#9a9a9d', font:{family:'IBM Plex Mono', size:10}}, grid:{color:'#ececea'}},
+        y:{stacked:true, ticks:{color:'#9a9a9d', font:{family:'IBM Plex Mono', size:10}}, grid:{color:'#ececea'}, title:{display:true, text:'S/ por mes', color:'#9a9a9d', font:{size:10}}},
+        y1:{position:'right', ticks:{color:'#9c0026', font:{family:'IBM Plex Mono', size:10}}, grid:{display:false}, title:{display:true, text:'S/ acumulado', color:'#9c0026', font:{size:10}}},
+      }
+    }
+  });
+}
+
+function renderSplitChart(k){
+  if(chartSplit) chartSplit.destroy();
+  const ctx = document.getElementById('chartSplit').getContext('2d');
+  chartSplit = new Chart(ctx, {
+    type:'doughnut',
+    data:{
+      labels:['Inductiva','Capacitiva'],
+      datasets:[{data:[k.indSol, k.capSol], backgroundColor:['#d40032','#15151a'], borderColor:'#ffffff', borderWidth:3}]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false, cutout:'68%',
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:(c)=>c.label+': '+fmtSol(c.raw)}}}
+    }
+  });
+  document.getElementById('splitLegend').innerHTML = `
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:#d40032;">● Inductiva</span><span class="mono">${fmtSol(k.indSol)}</span></div>
+    <div style="display:flex;justify-content:space-between;"><span style="color:#15151a;">● Capacitiva</span><span class="mono">${fmtSol(k.capSol)}</span></div>`;
+}
+
+function renderRanking(rows){
+  const byInm = {};
+  rows.forEach(r=>{ byInm[r.inmueble] = (byInm[r.inmueble]||0) + r.total_sol; });
+  const arr = Object.entries(byInm).sort((a,b)=>b[1]-a[1]);
+  const max = arr.length ? arr[0][1] : 1;
+  document.getElementById('rankList').innerHTML = arr.map(([name,val])=>`
+    <div class="rank-row">
+      <div class="rank-name">${name}</div>
+      <div class="rank-track"><div class="rank-fill" style="width:${max? (val/max*100):0}%"></div></div>
+      <div class="rank-val">${fmtSol(val)}</div>
+    </div>`).join('') || '<div style="color:var(--muted-2);font-size:12px;">Sin datos para el filtro seleccionado.</div>';
+}
+
+function renderTable(rows){
+  const byInm = {};
+  rows.forEach(r=>{
+    byInm[r.inmueble] = byInm[r.inmueble] || {kvarh:0, ind:0, cap:0, months:new Set()};
+    byInm[r.inmueble].kvarh += r.total_kvarh;
+    byInm[r.inmueble].ind += r.ind_sol;
+    byInm[r.inmueble].cap += r.cap_sol;
+    if(r.total_sol>0) byInm[r.inmueble].months.add(r.fecha);
+  });
+  const totalAll = Object.values(byInm).reduce((a,v)=>a+v.ind+v.cap,0);
+  const arr = Object.entries(byInm).map(([name,v])=>{
+    const total = v.ind+v.cap;
+    const nMonths = new Set(rows.filter(r=>r.inmueble===name).map(r=>r.fecha)).size;
+    const avg = nMonths? total/nMonths : 0;
+    return {name, kvarh:v.kvarh, ind:v.ind, cap:v.cap, total, months:v.months.size, avg, proj: avg*12, weight: totalAll? total/totalAll*100:0};
+  }).sort((a,b)=>b.total-a.total);
+
+  document.getElementById('tableBody').innerHTML = arr.map(r=>`
+    <tr>
+      <td>${r.name}</td>
+      <td class="muted">${r.months}</td>
+      <td>${fmtKvarh(r.kvarh)}</td>
+      <td>${fmtSol2(r.ind)}</td>
+      <td>${fmtSol2(r.cap)}</td>
+      <td style="color:var(--ink);font-weight:600;">${fmtSol2(r.total)}</td>
+      <td class="muted">${fmtSol(r.avg)}</td>
+      <td class="muted">${fmtSol(r.proj)}</td>
+      <td><div class="bar-cell"><div class="mini-bar"><i style="width:${r.weight}%"></i></div><span style="width:34px;display:inline-block;">${r.weight.toFixed(0)}%</span></div></td>
+    </tr>`).join('') || '<tr><td colspan="9" class="muted">Sin datos para el filtro seleccionado.</td></tr>';
+}
+
+// ---- ROI calculator ----
+const roiSelect = document.getElementById('roiInmueble');
+inmuebles.forEach(v=>{
+  const o = document.createElement('option'); o.value=v; o.textContent=v; roiSelect.appendChild(o);
+});
+const defaultTop = (()=>{
+  const byInm={};
+  RAW.forEach(r=>byInm[r.inmueble]=(byInm[r.inmueble]||0)+r.total_sol);
+  return Object.entries(byInm).sort((a,b)=>b[1]-a[1])[0][0];
+})();
+roiSelect.value = defaultTop;
+
+const roiCapex = document.getElementById('roiCapex');
+const roiPct = document.getElementById('roiPct');
+
+function renderROI(){
+  const inm = roiSelect.value;
+  const capex = Number(roiCapex.value);
+  const pct = Number(roiPct.value)/100;
+  document.getElementById('roiCapexVal').textContent = fmtSol(capex);
+  document.getElementById('roiPctVal').textContent = Math.round(pct*100)+'%';
+
+  const rows = RAW.filter(r=>r.inmueble===inm).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  const months = [...new Set(rows.map(r=>r.fecha))].sort();
+  const last12 = months.slice(-12);
+  const sumLast12 = rows.filter(r=>last12.includes(r.fecha)).reduce((a,r)=>a+r.total_sol,0);
+  const anualizado = last12.length ? sumLast12/last12.length*12 : 0;
+
+  const ahorroAnual = anualizado * pct;
+  const paybackMeses = ahorroAnual>0 ? capex/(ahorroAnual/12) : Infinity;
+  const neto5 = ahorroAnual*5 - capex;
+
+  document.getElementById('roiAnual').textContent = fmtSol(anualizado);
+  document.getElementById('roiAhorro').textContent = fmtSol(ahorroAnual);
+  document.getElementById('roiPayback').textContent = isFinite(paybackMeses) ? paybackMeses.toFixed(1)+' meses' : '—';
+  document.getElementById('roiNeto5').textContent = fmtSol(neto5);
+}
+roiSelect.addEventListener('change', renderROI);
+roiCapex.addEventListener('input', renderROI);
+roiPct.addEventListener('input', renderROI);
+
+function refresh(){
+  syncChipUI();
+  const rows = getFiltered();
+  const k = computeKPIs(rows);
+  renderKPIs(k);
+  renderTimeChart(rows);
+  renderSplitChart(k);
+  renderRanking(rows);
+  renderTable(rows);
+}
+
+refresh();
+renderROI();
+</script>
+</body>
+</html>
